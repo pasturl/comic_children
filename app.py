@@ -163,8 +163,43 @@ class MontessoriComicGenerator:
                 else:
                     return None
 
+def check_password():
+    """Returns `True` if the user has the correct password."""
+    
+    # Check if password is configured in secrets
+    if "password" not in st.secrets:
+        # If password is not configured, skip authentication
+        return True
+
+    def password_entered():
+        """Checks whether the password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password
+        st.text_input("Enter Password", type="password", key="password")
+        st.button("Login", on_click=password_entered)
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error
+        st.text_input("Enter Password", type="password", key="password")
+        st.button("Login", on_click=password_entered)
+        st.error("😕 Incorrect password")
+        return False
+    else:
+        # Password correct
+        return True
+
 def main():
     st.title("Montessori Comic Book Generator")
+    
+    if not check_password():
+        return
+        
     st.write("Create personalized educational comics based on Montessori principles")
     
     # Initialize the generator
