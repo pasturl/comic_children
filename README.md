@@ -7,7 +7,7 @@ An interactive Streamlit application that generates educational comic books. The
 - Generate educational story options based on user-provided themes
 - Create comic panels with AI-generated illustrations
 - Incorporate personal photos into the story
-- Built on Montessori educational principles
+- Built on educational principles
 
 ## Setup
 
