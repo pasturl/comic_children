@@ -23,6 +23,7 @@ class ComicGenerator:
         - Have a clear moral or educational message
         - Be structured in 6-8 scenes
         - Include interactive elements or questions
+        - Answer directly with the story options, without any other text
         - You must generate 10 different options. if the user specifies a number, you must generate that number of story options.
         
         Format your response EXACTLY like this example (keep the emojis):
@@ -269,21 +270,30 @@ def main():
                     elaborated_story = generator.elaborate_story(selected_story)
                     st.session_state.elaborated_story = elaborated_story
                     
-                    # Clean up the story text - handle both string and list cases
-                    if isinstance(elaborated_story, list):
-                        cleaned_story = str(elaborated_story[0]) if elaborated_story else ""
+                    # Clean up the story text
+                    if isinstance(elaborated_story, (str, bytes)):
+                        cleaned_story = elaborated_story
                     else:
                         cleaned_story = str(elaborated_story)
                     
-                    # Apply the cleaning operations
-                    cleaned_story = (cleaned_story.replace("[TextBlock(text='", "")
-                                               .replace("', type='text')]", "")
-                                               .replace('\\n', '\n')
+                    # More thorough cleaning
+                    cleaned_story = (cleaned_story.replace("TextBlock(text='", "")
+                                               .replace("text='", "")
+                                               .replace("')", "")
+                                               .replace("',", "")
+                                               .replace(" type='text')", "")
+                                               .replace("[", "")
+                                               .replace("]", "")
+                                               .replace("\\n", "\n")
                                                .strip())
                     
-                    # Display the elaborated story
+                    # Display the elaborated story with proper formatting
                     st.markdown("## 📖 Elaborated Story")
-                    st.markdown(cleaned_story)
+                    # Split the story into sections and format each properly
+                    sections = cleaned_story.split("\n\n")
+                    for section in sections:
+                        if section.strip():
+                            st.markdown(section.strip())
                     
                     # Add a confirmation button to proceed with comic generation
                     if st.button("Generate Comic Panels with this Story", key="confirm_panels"):
