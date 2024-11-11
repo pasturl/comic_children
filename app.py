@@ -268,7 +268,6 @@ def main():
                 with st.spinner("Elaborating story..."):
                     # First, elaborate the story
                     elaborated_story = generator.elaborate_story(selected_story)
-                    st.session_state.elaborated_story = elaborated_story
                     
                     # Clean up the story text
                     if isinstance(elaborated_story, (str, bytes)):
@@ -287,6 +286,10 @@ def main():
                                                .replace("\\n", "\n")
                                                .strip())
                     
+                    # Save both raw and cleaned versions to session state
+                    st.session_state.elaborated_story_raw = elaborated_story
+                    st.session_state.elaborated_story_clean = cleaned_story
+                    
                     # Display the elaborated story with proper formatting
                     st.markdown("## 📖 Elaborated Story")
                     # Split the story into sections and format each properly
@@ -294,60 +297,75 @@ def main():
                     for section in sections:
                         if section.strip():
                             st.markdown(section.strip())
+            
+            # Add this section to display the saved story if it exists
+            elif 'elaborated_story_clean' in st.session_state:
+                st.markdown("## 📖 Elaborated Story")
+                sections = st.session_state.elaborated_story_clean.split("\n\n")
+                for section in sections:
+                    if section.strip():
+                        st.markdown(section.strip())
+        
+            # Add a confirmation button to proceed with comic generation
+            if st.button("Generate Comic Panels with this Story", key="confirm_panels"):
+                if 'elaborated_story_clean' not in st.session_state:
+                    st.error("Please elaborate the story first before generating panels.")
+                    return
+                
+                with st.spinner("Generating image prompts..."):
+                    # Use the saved elaborated story from session state
+                    elaborated_story = st.session_state.elaborated_story_clean
                     
-                    # Add a confirmation button to proceed with comic generation
-                    if st.button("Generate Comic Panels with this Story", key="confirm_panels"):
-                        with st.spinner("Generating image prompts..."):
-                            # Continue with the existing image generation logic
-                            image_prompts = generator.generate_image_prompts(elaborated_story, uploaded_file)
-                            st.session_state.image_prompts = image_prompts
-                            
-                            st.markdown("## 🎨 Comic Panels")
-                            cols = st.columns(2)
-                            
-                            for i, prompt in enumerate(image_prompts):
-                                with cols[i % 2]:
-                                    with st.container():
-                                        st.markdown(f"### 🖼️ Panel {i+1}")
-                                        
-                                        # Clean up the prompt text for display
-                                        if isinstance(prompt, (str, bytes)):
-                                            display_prompt = prompt
-                                        else:
-                                            display_prompt = str(prompt)
-                                        
-                                        # Remove all TextBlock artifacts and clean up
-                                        display_prompt = (display_prompt.replace("[TextBlock(text=", "")
+                    # Continue with the existing image generation logic
+                    image_prompts = generator.generate_image_prompts(elaborated_story, uploaded_file)
+                    st.session_state.image_prompts = image_prompts
+                    
+                    st.markdown("## 🎨 Comic Panels")
+                    cols = st.columns(2)
+                    
+                    for i, prompt in enumerate(image_prompts):
+                        with cols[i % 2]:
+                            with st.container():
+                                st.markdown(f"### 🖼️ Panel {i+1}")
+                                
+                                # Clean up the prompt text for display
+                                if isinstance(prompt, (str, bytes)):
+                                    display_prompt = prompt
+                                else:
+                                    display_prompt = str(prompt)
+                                
+                                # Remove all TextBlock artifacts and clean up
+                                display_prompt = (display_prompt.replace("[TextBlock(text=", "")
                                                             .replace("text=", "")
                                                             .replace("[TextBlock(", "")
                                                             .replace("type='text')]", "")
                                                             .replace("'", "")
                                                             .replace('"', "")
                                                             .strip())
-                                        
-                                        # Save cleaned prompt to session state
-                                        if 'cleaned_prompts' not in st.session_state:
-                                            st.session_state.cleaned_prompts = {}
-                                        st.session_state.cleaned_prompts[i] = display_prompt
-                                        
-                                        # Display the prompt in a cleaner format
-                                        with st.expander("✨ View prompt details", expanded=False):
-                                            st.markdown(f"""
-                                            **Scene Description:**
-                                            {display_prompt}
-                                            """)
-                                        
-                                        # Generate and display the image
-                                        with st.spinner(f"Creating panel {i+1}..."):
-                                            image_url = generator.generate_comic_panel(prompt)
-                                            if image_url:
-                                                st.image(image_url, use_column_width=True)
-                                                # Save image URL to session state
-                                                if 'generated_images' not in st.session_state:
-                                                    st.session_state.generated_images = {}
-                                                st.session_state.generated_images[i] = image_url
-                                            else:
-                                                st.error(f"Could not generate panel {i+1}. Please try again.")
+                                
+                                # Save cleaned prompt to session state
+                                if 'cleaned_prompts' not in st.session_state:
+                                    st.session_state.cleaned_prompts = {}
+                                st.session_state.cleaned_prompts[i] = display_prompt
+                                
+                                # Display the prompt in a cleaner format
+                                with st.expander("✨ View prompt details", expanded=False):
+                                    st.markdown(f"""
+                                    **Scene Description:**
+                                    {display_prompt}
+                                    """)
+                                
+                                # Generate and display the image
+                                with st.spinner(f"Creating panel {i+1}..."):
+                                    image_url = generator.generate_comic_panel(prompt)
+                                    if image_url:
+                                        st.image(image_url, use_column_width=True)
+                                        # Save image URL to session state
+                                        if 'generated_images' not in st.session_state:
+                                            st.session_state.generated_images = {}
+                                        st.session_state.generated_images[i] = image_url
+                                    else:
+                                        st.error(f"Could not generate panel {i+1}. Please try again.")
         
         # Display saved panels if they exist
         elif 'image_prompts' in st.session_state:
