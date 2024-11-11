@@ -7,7 +7,7 @@ from io import BytesIO
 import anthropic
 import time
 
-class MontessoriComicGenerator:
+class ComicGenerator:
     def __init__(self):
         # Use environment variable or Streamlit secrets for both APIs
         self.client = anthropic.Client(api_key=st.secrets["ANTHROPIC_API_KEY"])
@@ -16,10 +16,10 @@ class MontessoriComicGenerator:
         
     def generate_story_options(self, theme):
         prompt = f"""Answer in the same language as the user's input.
-        As an expert in Montessori education and children's literature, generate 3 different story options for a children's comic book about {theme}. 
+        As an expert in education and children's literature, generate 3 different story options for a children's comic book about {theme}. 
         Each story should:
         - Be suitable for children aged 4-8
-        - Incorporate Montessori principles like independence, natural learning, and respect
+        - Incorporate educational principles like independence, natural learning, and respect
         - Have a clear moral or educational message
         - Be structured in 6-8 scenes
         - Include interactive elements or questions
@@ -163,47 +163,43 @@ class MontessoriComicGenerator:
                 else:
                     return None
 
-def check_password():
-    """Returns `True` if the user has the correct password."""
-    
-    # Check if password is configured in secrets
-    if "password" not in st.secrets:
-        # If password is not configured, skip authentication
-        return True
-
-    def password_entered():
-        """Checks whether the password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets["password"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # First run, show input for password
-        st.text_input("Enter Password", type="password", key="password")
-        st.button("Login", on_click=password_entered)
-        return False
-    elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error
-        st.text_input("Enter Password", type="password", key="password")
-        st.button("Login", on_click=password_entered)
-        st.error("😕 Incorrect password")
-        return False
-    else:
-        # Password correct
-        return True
+    def elaborate_story(self, story_summary):
+        prompt = f"""Based on this story summary:
+        {story_summary}
+        
+        Create a detailed narrative script for a children's comic book that:
+        - Expands the story into 6-8 scenes
+        - Includes dialogue and narration for each scene
+        - Maintains an educational and engaging tone for children aged 4-8
+        - Incorporates interactive questions or reflection points
+        - Follows educational principles
+        
+        Format your response EXACTLY like this:
+        
+        📖 Title: [Story Title]
+        
+        🎬 Scene 1:
+        Narration: [Scene description]
+        Dialogue: [Character dialogue]
+        💭 Interactive Moment: [Question or activity for the reader]
+        
+        🎬 Scene 2:
+        [Continue format for each scene...]"""
+        
+        message = self.client.messages.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return message.content
 
 def main():
-    st.title("Montessori Comic Book Generator")
-    
-    if not check_password():
-        return
-        
-    st.write("Create personalized educational comics based on Montessori principles")
+    st.title("Comic Book Generator")
+    st.write("Create personalized educational comics")
     
     # Initialize the generator
-    generator = MontessoriComicGenerator()
+    generator = ComicGenerator()
     
     # Theme input
     theme = st.text_input("Enter an educational theme (e.g., 'Learning to Share', 'Exploring Nature')")
@@ -267,58 +263,81 @@ def main():
                 key="story_selector"
             )
             
-            if selected_story and st.button("Generate Comic Panels", key="generate_panels"):
-                with st.spinner("Generating image prompts..."):
-                    # Generate and save image prompts to session state
-                    image_prompts = generator.generate_image_prompts(selected_story, uploaded_file)
-                    st.session_state.image_prompts = image_prompts
+            if selected_story and st.button("Elaborate Story", key="generate_panels"):
+                with st.spinner("Elaborating story..."):
+                    # First, elaborate the story
+                    elaborated_story = generator.elaborate_story(selected_story)
+                    st.session_state.elaborated_story = elaborated_story
                     
-                    st.markdown("## 🎨 Comic Panels")
-                    cols = st.columns(2)
+                    # Clean up the story text - handle both string and list cases
+                    if isinstance(elaborated_story, list):
+                        cleaned_story = str(elaborated_story[0]) if elaborated_story else ""
+                    else:
+                        cleaned_story = str(elaborated_story)
                     
-                    for i, prompt in enumerate(image_prompts):
-                        with cols[i % 2]:
-                            with st.container():
-                                st.markdown(f"### 🖼️ Panel {i+1}")
-                                
-                                # Clean up the prompt text for display
-                                if isinstance(prompt, (str, bytes)):
-                                    display_prompt = prompt
-                                else:
-                                    display_prompt = str(prompt)
-                                
-                                # Remove all TextBlock artifacts and clean up
-                                display_prompt = (display_prompt.replace("[TextBlock(text=", "")
+                    # Apply the cleaning operations
+                    cleaned_story = (cleaned_story.replace("[TextBlock(text='", "")
+                                               .replace("', type='text')]", "")
+                                               .replace('\\n', '\n')
+                                               .strip())
+                    
+                    # Display the elaborated story
+                    st.markdown("## 📖 Elaborated Story")
+                    st.markdown(cleaned_story)
+                    
+                    # Add a confirmation button to proceed with comic generation
+                    if st.button("Generate Comic Panels with this Story", key="confirm_panels"):
+                        with st.spinner("Generating image prompts..."):
+                            # Continue with the existing image generation logic
+                            image_prompts = generator.generate_image_prompts(elaborated_story, uploaded_file)
+                            st.session_state.image_prompts = image_prompts
+                            
+                            st.markdown("## 🎨 Comic Panels")
+                            cols = st.columns(2)
+                            
+                            for i, prompt in enumerate(image_prompts):
+                                with cols[i % 2]:
+                                    with st.container():
+                                        st.markdown(f"### 🖼️ Panel {i+1}")
+                                        
+                                        # Clean up the prompt text for display
+                                        if isinstance(prompt, (str, bytes)):
+                                            display_prompt = prompt
+                                        else:
+                                            display_prompt = str(prompt)
+                                        
+                                        # Remove all TextBlock artifacts and clean up
+                                        display_prompt = (display_prompt.replace("[TextBlock(text=", "")
                                                             .replace("text=", "")
                                                             .replace("[TextBlock(", "")
                                                             .replace("type='text')]", "")
                                                             .replace("'", "")
                                                             .replace('"', "")
                                                             .strip())
-                                
-                                # Save cleaned prompt to session state
-                                if 'cleaned_prompts' not in st.session_state:
-                                    st.session_state.cleaned_prompts = {}
-                                st.session_state.cleaned_prompts[i] = display_prompt
-                                
-                                # Display the prompt in a cleaner format
-                                with st.expander("✨ View prompt details", expanded=False):
-                                    st.markdown(f"""
-                                    **Scene Description:**
-                                    {display_prompt}
-                                    """)
-                                
-                                # Generate and display the image
-                                with st.spinner(f"Creating panel {i+1}..."):
-                                    image_url = generator.generate_comic_panel(prompt)
-                                    if image_url:
-                                        st.image(image_url, use_column_width=True)
-                                        # Save image URL to session state
-                                        if 'generated_images' not in st.session_state:
-                                            st.session_state.generated_images = {}
-                                        st.session_state.generated_images[i] = image_url
-                                    else:
-                                        st.error(f"Could not generate panel {i+1}. Please try again.")
+                                        
+                                        # Save cleaned prompt to session state
+                                        if 'cleaned_prompts' not in st.session_state:
+                                            st.session_state.cleaned_prompts = {}
+                                        st.session_state.cleaned_prompts[i] = display_prompt
+                                        
+                                        # Display the prompt in a cleaner format
+                                        with st.expander("✨ View prompt details", expanded=False):
+                                            st.markdown(f"""
+                                            **Scene Description:**
+                                            {display_prompt}
+                                            """)
+                                        
+                                        # Generate and display the image
+                                        with st.spinner(f"Creating panel {i+1}..."):
+                                            image_url = generator.generate_comic_panel(prompt)
+                                            if image_url:
+                                                st.image(image_url, use_column_width=True)
+                                                # Save image URL to session state
+                                                if 'generated_images' not in st.session_state:
+                                                    st.session_state.generated_images = {}
+                                                st.session_state.generated_images[i] = image_url
+                                            else:
+                                                st.error(f"Could not generate panel {i+1}. Please try again.")
         
         # Display saved panels if they exist
         elif 'image_prompts' in st.session_state:
@@ -343,5 +362,5 @@ def main():
                             st.image(st.session_state.generated_images[i], use_column_width=True)
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="Montessori Comic Generator", layout="wide")
+    st.set_page_config(page_title="Comic Generator", layout="wide")
     main()
